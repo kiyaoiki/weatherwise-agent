@@ -6,74 +6,63 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-WMO_CODES = {
-    0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",
-    45:"Fog",48:"Rime fog",51:"Light drizzle",53:"Moderate drizzle",55:"Dense drizzle",
-    61:"Slight rain",63:"Moderate rain",65:"Heavy rain",71:"Slight snow",73:"Moderate snow",
-    75:"Heavy snow",80:"Slight showers",81:"Moderate showers",82:"Violent showers",
-    95:"Thunderstorm",96:"Thunderstorm with hail",
-}
-
 async def get_weather(city: str) -> dict:
-    async with httpx.AsyncClient(timeout=10) as client:
-        geo = await client.get(
-            "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": city, "count": 1, "language": "en", "format": "json"}
+    """Fetch weather from wttr.in - no rate limits, no API key needed."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get(
+            f"https://wttr.in/{city}",
+            params={"format": "j1"},
+            headers={"User-Agent": "WeatherWise-Agent/1.0"}
         )
-        geo.raise_for_status()
-        geo_data = geo.json()
-        if not geo_data.get("results"):
-            return {"error": f"City not found: {city}"}
-        r = geo_data["results"][0]
-        lat, lon = r["latitude"], r["longitude"]
-        weather = await client.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": lat, "longitude": lon,
-                "current": ["temperature_2m","relative_humidity_2m","apparent_temperature",
-                            "precipitation","weathercode","windspeed_10m","pressure_msl","uv_index"],
-                "daily": ["temperature_2m_max","temperature_2m_min","precipitation_sum","weathercode"],
-                "forecast_days": 5, "timezone": "auto",
-            }
-        )
-        weather.raise_for_status()
-        w = weather.json()
+        response.raise_for_status()
+        data = response.json()
 
-    current = w["current"]
-    daily = w["daily"]
-    forecast = [
-        {"date": daily["time"][i], "max_temp_c": daily["temperature_2m_max"][i],
-         "min_temp_c": daily["temperature_2m_min"][i], "precipitation_mm": daily["precipitation_sum"][i],
-         "condition": WMO_CODES.get(daily["weathercode"][i], "Unknown")}
-        for i in range(len(daily["time"]))
-    ]
-    return {
-        "location": {"city": r["name"], "country": r.get("country",""), "latitude": lat, "longitude": lon},
-        "current": {
-            "temperature_c": current["temperature_2m"], "feels_like_c": current["apparent_temperature"],
-            "humidity_pct": current["relative_humidity_2m"], "wind_speed_kmh": current["windspeed_10m"],
-            "precipitation_mm": current["precipitation"], "pressure_hpa": current["pressure_msl"],
-            "uv_index": current.get("uv_index"),
-            "condition": WMO_CODES.get(current.get("weathercode", 0), "Unknown"),
-        },
-        "forecast_5_days": forecast,
-        "timezone": w.get("timezone", "UTC"),
-    }
+        current = data["current_condition"][0]
+        area = data["nearest_area"][0]
+        city_name = area["areaName"][0]["value"]
+        country = area["country"][0]["value"]
+
+        forecast = []
+        for day in data["weather"]:
+            forecast.append({
+                "date": day["date"],
+                "max_temp_c": day["maxtempC"],
+                "min_temp_c": day["mintempC"],
+                "avg_temp_c": day["avgtempC"],
+                "precipitation_mm": day["hourly"][4]["precipMM"],
+                "condition": day["hourly"][4]["weatherDesc"][0]["value"],
+                "sunrise": day["astronomy"][0]["sunrise"],
+                "sunset": day["astronomy"][0]["sunset"],
+            })
+
+        return {
+            "location": {"city": city_name, "country": country},
+            "current": {
+                "temperature_c": current["temp_C"],
+                "feels_like_c": current["FeelsLikeC"],
+                "humidity_pct": current["humidity"],
+                "wind_speed_kmh": current["windspeedKmph"],
+                "wind_direction": current["winddir16Point"],
+                "visibility_km": current["visibility"],
+                "uv_index": current["uvIndex"],
+                "pressure_mb": current["pressure"],
+                "condition": current["weatherDesc"][0]["value"],
+            },
+            "forecast_3_days": forecast,
+        }
 
 
 async def run_agent(city: str) -> str:
-    # Step 1: fetch live weather via MCP-style tool call
     weather_data = await get_weather(city)
     if "error" in weather_data:
-        return f"Sorry, could not find weather data for {city}."
+        return f"Sorry, could not fetch weather for {city}: {weather_data['error']}"
 
-    # Step 2: send to Groq LLM
     system_prompt = """You are WeatherWise, an expert meteorological AI assistant.
 You will receive structured weather JSON and must generate a rich friendly weather report including:
 - A warm greeting with city name and country
 - Current conditions: temperature, feels like, humidity, wind, UV index, pressure, sky description
 - A practical recommendation (umbrella? sunscreen? jacket?)
-- A clear 5-day forecast with emojis for each day
+- A clear 3-day forecast with emojis for each day
 - A closing weather tip
 Use weather emojis generously. Format numbers cleanly e.g. 23C, 65%, 12 km/h."""
 
