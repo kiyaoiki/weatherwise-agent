@@ -1,0 +1,1 @@
+﻿# WeatherWise MCP Server Package

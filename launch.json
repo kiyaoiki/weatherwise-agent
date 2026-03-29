@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ Run WeatherWise (FastAPI)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "▶ Test Agent CLI (Bengaluru)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/agent/weather_agent.py",
+      "args": ["Bengaluru"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "▶ Test MCP Server",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/mcp_server/weather_mcp_server.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

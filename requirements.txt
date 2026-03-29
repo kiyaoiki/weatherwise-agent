@@ -1,0 +1,14 @@
+# Core
+fastapi==0.115.5
+uvicorn[standard]>=0.34.0
+httpx>=0.28.1,<1.0.0
+pydantic>=2.11.0
+
+# Google ADK (Agent Development Kit)
+google-adk==0.5.0
+
+# MCP (Model Context Protocol)
+mcp>=1.5.0
+
+# Google Generative AI
+google-genai>=1.12.1

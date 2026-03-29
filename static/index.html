@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WeatherWise — AI Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sky-dark:   #0a0f1e;
+      --sky-mid:    #0d1b3e;
+      --sky-accent: #1a3a6b;
+      --gold:       #f5c842;
+      --gold-dim:   #c99e20;
+      --cyan:       #4dd9ff;
+      --cyan-dim:   #1fa8d4;
+      --white:      #f0f4ff;
+      --muted:      #7b8db0;
+      --card-bg:    rgba(13, 27, 62, 0.75);
+      --border:     rgba(77, 217, 255, 0.15);
+    }
+
+    body {
+      background: var(--sky-dark);
+      color: var(--white);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated sky background ── */
+    .sky-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse at 20% 0%, #1a3a6b 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 10%, #0d2a55 0%, transparent 50%),
+                  linear-gradient(180deg, #0a0f1e 0%, #060b14 100%);
+    }
+    .stars {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 8%,  rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 55% 22%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 75% 5%,  rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 18%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 45% 3%, rgba(255,255,255,0.8) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65% 12%, rgba(255,255,255,0.5) 0%, transparent 100%);
+    }
+
+    /* ── Layout ── */
+    .wrapper {
+      position: relative; z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+    .logo-row {
+      display: flex; align-items: center; justify-content: center; gap: 14px;
+      margin-bottom: 12px;
+    }
+    .logo-icon {
+      font-size: 2.8rem;
+      filter: drop-shadow(0 0 18px #f5c84280);
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-6px); }
+    }
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 16px;
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.72rem;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .dot { width:6px; height:6px; border-radius:50%; background:var(--cyan); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Search card ── */
+    .search-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      backdrop-filter: blur(20px);
+      margin-bottom: 32px;
+    }
+    .search-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .search-row {
+      display: flex; gap: 12px;
+    }
+    input[type="text"] {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--white);
+      font-family: 'DM Mono', monospace;
+      font-size: 1rem;
+      padding: 14px 20px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="text"]:focus {
+      border-color: var(--cyan-dim);
+      box-shadow: 0 0 0 3px rgba(77,217,255,0.1);
+    }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    button.search-btn {
+      background: linear-gradient(135deg, var(--gold) 0%, #e8a820 100%);
+      border: none;
+      border-radius: 12px;
+      color: var(--sky-dark);
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 14px 28px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      white-space: nowrap;
+    }
+    button.search-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(245,200,66,0.35); }
+    button.search-btn:active { transform: translateY(0); }
+    button.search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .quick-cities {
+      margin-top: 16px;
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .city-chip {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      padding: 5px 14px;
+      transition: all 0.15s;
+    }
+    .city-chip:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+    /* ── Loading ── */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+    .loading.active { display: block; }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-steps { font-size: 0.78rem; }
+    .loading-step { opacity: 0; transition: opacity 0.4s; }
+    .loading-step.visible { opacity: 1; }
+
+    /* ── Result card ── */
+    .result-card {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+      animation: slideUp 0.4s ease;
+    }
+    .result-card.active { display: block; }
+    @keyframes slideUp {
+      from { opacity:0; transform: translateY(20px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    .result-header {
+      background: linear-gradient(135deg, rgba(245,200,66,0.08), rgba(77,217,255,0.06));
+      border-bottom: 1px solid var(--border);
+      padding: 20px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .result-city {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+    .result-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .result-body {
+      padding: 28px;
+      white-space: pre-wrap;
+      line-height: 1.9;
+      font-size: 0.88rem;
+      color: #c8d6f5;
+    }
+
+    /* ── Architecture section ── */
+    .arch-section {
+      margin-top: 48px;
+    }
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .arch-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .arch-card:hover { border-color: rgba(77,217,255,0.3); }
+    .arch-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .arch-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 4px;
+    }
+    .arch-desc { font-size: 0.73rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── Error ── */
+    .error-box {
+      display: none;
+      background: rgba(255,80,80,0.08);
+      border: 1px solid rgba(255,80,80,0.25);
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #ff8080;
+      font-size: 0.82rem;
+      margin-bottom: 16px;
+    }
+    .error-box.active { display: block; }
+
+    @media (max-width: 520px) {
+      .search-row { flex-direction: column; }
+      button.search-btn { width: 100%; }
+      .result-header { flex-direction: column; gap: 8px; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky-bg"></div>
+  <div class="stars"></div>
+
+  <div class="wrapper">
+    <!-- Header -->
+    <header>
+      <div class="logo-row">
+        <span class="logo-icon">⛅</span>
+        <h1>WeatherWise</h1>
+      </div>
+      <p class="subtitle">AI Weather Agent · MCP + ADK + Open-Meteo</p>
+      <div class="badge">
+        <span class="dot"></span>
+        Live Data · No API Key Required
+      </div>
+    </header>
+
+    <!-- Search -->
+    <div class="search-card">
+      <p class="search-label">Enter a city to get started</p>
+      <div class="search-row">
+        <input type="text" id="cityInput" placeholder="e.g. Bengaluru, Tokyo, Paris..." autocomplete="off" />
+        <button class="search-btn" id="searchBtn" onclick="fetchWeather()">Get Report →</button>
+      </div>
+      <div class="quick-cities">
+        <span class="search-label" style="width:100%;margin-bottom:0">Quick select:</span>
+        <button class="city-chip" onclick="quickCity('Bengaluru')">🇮🇳 Bengaluru</button>
+        <button class="city-chip" onclick="quickCity('Mumbai')">🇮🇳 Mumbai</button>
+        <button class="city-chip" onclick="quickCity('London')">🇬🇧 London</button>
+        <button class="city-chip" onclick="quickCity('Tokyo')">🇯🇵 Tokyo</button>
+        <button class="city-chip" onclick="quickCity('New York')">🇺🇸 New York</button>
+        <button class="city-chip" onclick="quickCity('Sydney')">🇦🇺 Sydney</button>
+        <button class="city-chip" onclick="quickCity('Dubai')">🇦🇪 Dubai</button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- Loading -->
+    <div class="loading" id="loadingBox">
+      <div class="spinner"></div>
+      <div class="loading-steps">
+        <div class="loading-step" id="step1">🔗 Connecting to MCP server...</div>
+        <div class="loading-step" id="step2">🌍 Geocoding city location...</div>
+        <div class="loading-step" id="step3">🌡️ Fetching live weather data...</div>
+        <div class="loading-step" id="step4">🤖 ADK agent generating report...</div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <span class="result-city" id="resultCity"></span>
+        <span class="result-meta" id="resultMeta"></span>
+      </div>
+      <div class="result-body" id="resultBody"></div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="arch-section">
+      <p class="section-title">How it works</p>
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-icon">🤖</div>
+          <div class="arch-name">Google ADK</div>
+          <div class="arch-desc">Agent Development Kit orchestrates the LLM reasoning and tool-use loop</div>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">🔌</div>
+          <div class="arch-name">MCP Protocol</div>
+          <div class="arch-desc">Model Context Protocol connects the agent to the weather tool via stdio transport</div>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">🌦️</div>
+          <div class="arch-name">Open-Meteo</div>
+          <div class="arch-desc">Free weather API with global coverage — no key needed, GDPR-compliant</div>
+        </div>
+        <div class="arch-card">
+          <div class="arch-icon">☁️</div>
+          <div class="arch-name">Cloud Run</div>
+          <div class="arch-desc">Deployed serverlessly on Google Cloud Run with auto-scaling to zero</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const cityInput  = document.getElementById('cityInput');
+    const searchBtn  = document.getElementById('searchBtn');
+    const loadingBox = document.getElementById('loadingBox');
+    const resultCard = document.getElementById('resultCard');
+    const errorBox   = document.getElementById('errorBox');
+
+    cityInput.addEventListener('keydown', e => { if (e.key === 'Enter') fetchWeather(); });
+
+    function quickCity(city) {
+      cityInput.value = city;
+      fetchWeather();
+    }
+
+    function showLoading() {
+      loadingBox.classList.add('active');
+      resultCard.classList.remove('active');
+      errorBox.classList.remove('active');
+      const steps = ['step1','step2','step3','step4'];
+      steps.forEach(s => document.getElementById(s).classList.remove('visible'));
+      steps.forEach((s, i) => setTimeout(() => document.getElementById(s).classList.add('visible'), i * 900));
+    }
+
+    async function fetchWeather() {
+      const city = cityInput.value.trim();
+      if (!city) { cityInput.focus(); return; }
+
+      searchBtn.disabled = true;
+      showLoading();
+
+      try {
+        const res  = await fetch('/api/weather', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ city }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Unknown error');
+
+        loadingBox.classList.remove('active');
+        document.getElementById('resultCity').textContent = `📍 ${data.city}`;
+        document.getElementById('resultMeta').textContent = `Generated in ${data.duration_ms.toFixed(0)}ms`;
+        document.getElementById('resultBody').textContent = data.report;
+        resultCard.classList.add('active');
+        resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        loadingBox.classList.remove('active');
+        errorBox.textContent = `⚠️ ${err.message}`;
+        errorBox.classList.add('active');
+      } finally {
+        searchBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
